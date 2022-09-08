@@ -40,7 +40,7 @@ class TextNormalBasedLocalization(object):
         if self.client is None:
             raise ValueError()
         self.AllTextObjects = [TextInstance(ID, f'StickerTextActor_{2 * ID - 1}') for ID in range(self.MaxTextCount)]
-        
+
         self.WordPainter = [WordRenderer(ContentPath=self.ContentPath, is_debug=self.is_debug,
                                         Language=language,
                                         FontSize=kwargs.get('FontSize', [15, 128])
@@ -52,7 +52,7 @@ class TextNormalBasedLocalization(object):
     
     def PutTextStep(self, *args, **kwargs):
         # Step 1: get scene attributes
-        NormalMap = self.client.getNormal()
+        NormalMap = self.client.getNormal() # NormalMap和对应的原图还是有些区别
         # Step 2: propose boxes and colors
         NBM = TextNormalBasedLocalization.getNormalBoundaryDifference(
             NormalMap, 
@@ -87,9 +87,9 @@ class TextNormalBasedLocalization(object):
         if self.is_debug:
             print('Ready to localize text.... ')
         _ = self.client.LoadTextAttr(attr_path)
-        
+
         # Step 5: load adjusted box
-        _ = self.client.GetAllTextLocation(len(BoxProposals), adjusted_box_path)
+        _ = self.client.GetAllTextLocation(len(BoxProposals), adjusted_box_path) # 这步往adjusted_box_path写了数据
         if self.is_debug:
             print('Text box adjusted.... ')
         lines = open(adjusted_box_path, 'r').readlines()
@@ -110,8 +110,9 @@ class TextNormalBasedLocalization(object):
         word_img_file_handle = open(word_img_path, 'w')
         word_img_file_handle.write(f'{len(BoxProposals)}\n')
         self.TextNum = 0
-        overlapping_check_map = LightMap[:, :, 0].astype(np.float32) * 0.  # [HxW]
+        overlapping_check_map = LightMap[:, :, 0].astype(np.float32) * 0.  # [HxW] 黑色的
         map_h, map_w = overlapping_check_map.shape
+        # 存在一张图上没有字的可能性
         for ID, (loc, color) in enumerate(zip(box_loc, Colors)):
             # clockwise
             isValid = loc[0] > 0.5
@@ -121,20 +122,20 @@ class TextNormalBasedLocalization(object):
             point_1 = np.array(LOC[2:4])
             point_2 = np.array(LOC[4:6])
             point_3 = np.array(LOC[6:8])
-            box_height = int(min(norm(point_0-point_3), norm(point_1-point_2)))
+            box_height = int(min(norm(point_0-point_3), norm(point_1-point_2))) # 2范数
             box_width = int(min(norm(point_0-point_1), norm(point_3-point_2)))
             
             if isValid:
                 # check if this is drawable
                 contour = np.stack([point_0, point_1, point_2, point_3], axis=0) # 4x2
-                text_mask = np.zeros((map_h, map_w, 3), np.float32)
-                cv2.fillPoly(text_mask, np.int_([contour]), (255, 255, 255))
+                text_mask = np.zeros((map_h, map_w, 3), np.float32) # 黑色mask
+                cv2.fillPoly(text_mask, np.int_([contour]), (255, 255, 255)) # 填充白颜色
                 text_mask = (text_mask[:, :, 0] > 0).astype(np.float32)
                 overlap_sum = np.sum(overlapping_check_map * text_mask)
                 # this hyper-parameter needs tuning...
                 if overlap_sum > 10.0:
                     self.AllTextObjects[ID].IsValid = False
-                    word_img_file_handle.write(self.WordPainter[0].empty_path+'\n')
+                    word_img_file_handle.write(self.WordPainter[0].empty_path+'\n') # empty.png
                     continue
                 else:
                     overlapping_check_map += text_mask
@@ -170,6 +171,7 @@ class TextNormalBasedLocalization(object):
                 self.AllTextObjects[ID].cbox = CBOX
                 self.TextNum += 1
                 self.AllTextObjects[ID].adjusted_pos = np.array(LOC).reshape(4,1,2).astype(np.float32)
+                break # 一张图片就生成了一个文本。前面的判断都是把透明的图片加进来，还有一个是加入了use_real_img
             else:
                 word_img_file_handle.write(self.WordPainter[0].empty_path+'\n')
         word_img_file_handle.close()
@@ -185,6 +187,7 @@ class TextNormalBasedLocalization(object):
         :param DifferenceThreshold:
         :return: (h/4,w/4)
         """
+        # NormalMap的h、w缩小reduceRatio倍，c不变
         NormalMap = block_reduce(NormalMap, (reduceRatio, reduceRatio, 1), np.mean)
         if useCannyEdge:
             NormalMap = NormalMap.astype(np.uint8)
@@ -200,13 +203,16 @@ class TextNormalBasedLocalization(object):
             left_img[:, 1:] = NormalMap[:, :w - 1]
             right_img = np.zeros_like(NormalMap)
             right_img[:, :w - 1] = NormalMap[:, 1:]
+            # np.linalg.norm求范数，本例求一范数
             d_left = np.linalg.norm(left_img - NormalMap, 1, axis=2)
             d_right = np.linalg.norm(right_img - NormalMap, 1, axis=2)
             d_up = np.linalg.norm(up_img - NormalMap, 1, axis=2)
             d_down = np.linalg.norm(down_img - NormalMap, 1, axis=2)
             raw_edge = np.stack([d_up, d_down, d_left, d_right], axis=-1)
             # thresholding + eliminating sky
+            # NormalMap中天空是黑色的，所以可以用后面一项过滤掉天空，第二项导致edge肯定为1
             dd_img = np.max(raw_edge, axis=-1) + (np.sum(NormalMap, axis=2) < 10).astype(np.float) * (DifferenceThreshold+100)
+            # edge 一维
             edge = (dd_img > DifferenceThreshold).astype(np.uint8)
         if len(edge.shape) == 3:
             return edge[:, :, 0]
@@ -222,6 +228,7 @@ class TextNormalBasedLocalization(object):
             print("Start to sample colors...")
         for text_id in range(text_num):
             UL_x, UL_y, BR_x, BR_y = Proposals[text_id]
+            # avg_color shape:(1, 3)
             avg_color = np.mean(np.mean(LightMap_float[UL_y:BR_y, 
                                                        UL_x:BR_x], 
                                         axis=0), 
@@ -251,7 +258,7 @@ class TextNormalBasedLocalization(object):
                     randomColor /= (np.max(randomColor) + 1e-3)
                     randomColor *= (np.random.random() + 1e-5)**1.7 * 255
                 Distance = float(np.mean(np.abs(randomColor - avg_color)))
-                if Distance > 40 or count > 10:
+                if Distance > 40 or count > 10:  # count取10，效率能高一点，但颜色不一定好
                     randomColor = randomColor[0]
                     break
                 else:

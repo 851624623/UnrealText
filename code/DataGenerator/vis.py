@@ -24,12 +24,12 @@ def ShowImgAndAnnotation(img_path, texts, bboxes, diff, cboxes=None):
     """
     img = cv.imread(img_path)
     img_ = img.copy()
-    filtered_bbox = [box.astype(np.int) for box in bboxes if np.min(np.reshape(box, (-1,))) > 0]
+    filtered_bbox = [box.astype(np.int32) for box in bboxes if np.min(np.reshape(box, (-1,))) > 0]
     img = cv.drawContours(img, filtered_bbox, -1, (255, 0, 0), 3)
     if cboxes:
-        filtered_cbox = [box.astype(np.int) for box in cboxes if np.min(np.reshape(box, (-1,))) > 0]
+        filtered_cbox = [box.astype(np.int32) for box in cboxes if np.min(np.reshape(box, (-1,))) > 0]
         img = cv.drawContours(img, filtered_cbox, -1, (0, 255, 0), 3)
-    diff_box = np.array([bboxes[i] for i in range(len(diff)) if diff[i] == 1])
+    diff_box = np.array([bboxes[i] for i in range(len(diff)) if diff[i] == 1]) # is_difficult都为0
     img = cv.drawContours(img, diff_box, -1, (128, 128, 128), 3)
     show(img)
 

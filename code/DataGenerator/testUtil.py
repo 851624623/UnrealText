@@ -10,6 +10,7 @@ def show(img, text=''):
     :param img: ndarray (HxWx3)
     :return:
     """
+    # 1是黄色，0是紫色
     plt.imshow(img)
     plt.title(text)
     plt.show()
@@ -39,8 +40,8 @@ def ShowImgAndAnnotation(img_path, texts, bboxes, cboxes):
     :return:
     """
     img = cv.imread(img_path)
-    filtered_bbox = [box.astype(np.int).reshape(-1, 4, 2) for box in np.array(bboxes) if np.min(np.reshape(box, (-1,))) > 0]
-    filtered_cbox = [box.astype(np.int).reshape(-1, 4, 2) for box in np.array(cboxes) if np.min(np.reshape(box, (-1,))) > 0]
+    filtered_bbox = [box.astype(np.int32).reshape(-1, 4, 2) for box in np.array(bboxes) if np.min(np.reshape(box, (-1,))) > 0]
+    filtered_cbox = [box.astype(np.int32).reshape(-1, 4, 2) for box in np.array(cboxes) if np.min(np.reshape(box, (-1,))) > 0]
     img = cv.drawContours(img, filtered_bbox, -1, (255, 0, 0), 3)
     img = cv.drawContours(img, filtered_cbox, -1, (0, 255, 0), 3)
     show(img, 'image_and_annotation')

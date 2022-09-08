@@ -53,7 +53,7 @@ class DataGenerator(object):
         while os.path.isdir(self.RootPath):
             root_path, count = self.RootPath.split('_')
             self.RootPath = root_path + '_' + str(int(count) + 1)
-        print(f"Data will be saved to: {self.RootPath}")
+        print(f"\nData will be saved to: {self.RootPath}")
         self.LabelPath = osp.join(self.RootPath, 'Label.json')
         self.DataLabel = None
         self.ImgFolder = osp.join(self.RootPath, 'imgs')
@@ -178,6 +178,7 @@ class DataGenerator(object):
         return {'force_change_camera_anchor':force_change_camera_anchor}
             
     def StartGeneration(self, IterationNum=10000, sleep_time=0, sleep_freq=1):
+        # 如果图片上没有字，force_change_camera_anchor为True，就会换位置
         status = {'force_change_camera_anchor':False}
         for Count in range(IterationNum):
             status = self._GenerateOneImageInstance(Count, **status)

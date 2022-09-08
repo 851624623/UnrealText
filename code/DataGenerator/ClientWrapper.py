@@ -19,8 +19,8 @@ class WrappedClient(object):
         os.makedirs(self.HighResPath, exist_ok=True)
         self.lowResPath = f'../../../PackagedEnvironment/{UnrealProjectName}/Demo/Binaries/Linux/cache.png'
 
-    def setres(self, w, h):
-        print(f'    Windows will be set to {w}x{h}')
+    def setres(self, w, h): # 设置分辨率
+        print(f'Windows will be set to {w}x{h}')
         _ = self.client.request(f"vrun r.setres {w}x{h}w")
         self.size = (w, h)
 
@@ -67,8 +67,8 @@ class WrappedClient(object):
 
     def getNormal(self):
         # output: h x w x 4
-        # return with the set size, hHxW3
-        imgBinary = self.client.request('vget /camera/0/normal png')
+        # return with the set size, HxWx3
+        imgBinary = self.client.request('vget /camera/0/normal png') # bytes
         return WrappedClient.readPNGFromBinary(imgBinary)[:, :, :3]
 
     def getColor(self, return_path=False):
@@ -76,7 +76,7 @@ class WrappedClient(object):
         get the lighting map
         return: h x w x 3
         """
-        _ = self.client.request(f'vget /camera/0/lit ./cache.png')
+        _ = self.client.request(f'vget /camera/0/lit ./cache.png') # 这步会更新self.lowResPath
         if return_path:
             returns = cv.imread(self.lowResPath), self.lowResPath
         else:
@@ -98,7 +98,7 @@ class WrappedClient(object):
         """
         _ = self.client.request(f'vget /object/GetAdjusted {num} {savepath}')
 
-    def  LoadTextAttr(self, path):
+    def LoadTextAttr(self, path):
         _ = self.client.request(f'vget /object/LoadTextAttr {path}')
         
     def LoadTextImages(self, path):
@@ -123,6 +123,7 @@ class WrappedClient(object):
         ID = path.split('/')[-1].split('.')[0]
         t = 0.5
         while True:
+            # self.HighResPath内开始没有图片，然后_ = self.client.request(f'vrun HighResShot 1.5')这步使其存在图片
             files = list(filter(lambda x:x.find(ID+'.') >= 0, os.listdir(self.HighResPath)))
             if len(files) > 0:
                 file = os.path.join(self.HighResPath, files[0])

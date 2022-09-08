@@ -27,7 +27,8 @@ font_paths = {
     "Italian": "../../../resources/fonts&corpus/Latin/fonts/",
     "Bangla": "../../../resources/fonts&corpus/Bangla/fonts/",
     "Hindi": "../../../resources/fonts&corpus/Hindi/fonts/",
-    "Latin": "../../../resources/fonts&corpus/Latin/fonts/"
+    "Latin": "../../../resources/fonts&corpus/Latin/fonts/",
+    "Tibetan": "../../../resources/fonts&corpus/Tibetan/fonts/"
 }
 
 corpus_paths = {
@@ -41,7 +42,8 @@ corpus_paths = {
     "Italian": "../../../resources/fonts&corpus/Latin/corpus/corpus_it.xml",
     "Bangla": "../../../resources/fonts&corpus/Bangla/corpus/corpus_bn.xml",
     "Hindi": "../../../resources/fonts&corpus/Hindi/corpus/corpus_hi.xml",
-    "Latin": "../../../resources/fonts&corpus/Latin/corpus/corpus_latin.xml"
+    "Latin": "../../../resources/fonts&corpus/Latin/corpus/corpus_latin.xml",
+    "Tibetan": "../../../resources/fonts&corpus/Tibetan/corpus/corpus.txt"
 }
 
 SeparatedBySpace = {
@@ -55,7 +57,8 @@ SeparatedBySpace = {
     "Italian": True, 
     "Bangla": True, 
     "Hindi": True, 
-    "Latin": True
+    "Latin": True,
+    "Tibetan": False, 
 }
 
 class WordRenderer(object):
@@ -107,10 +110,11 @@ class WordRenderer(object):
                     break
                 except:
                     print('Error in loading backgrounds. retry...')
-            if h < 1e-3 or Height < 1e-3:
+            if h < 1e-3 or Height < 1e-3: # 有问题的图片
                 return ''
             aspect_ratio_img = w / h
             aspect_ratio_target = Width / Height
+            # 为了让max_height，max_weight包含在Height，Width中
             if aspect_ratio_img > aspect_ratio_target:
                 max_height = h
                 max_weight = aspect_ratio_target * h
@@ -157,10 +161,15 @@ class WordRenderer(object):
                     text_joint = texts[-1].strip()
                 
                 w, h = self.CurrentFont.getsize(text_joint)
+                # 超过一行的情况
                 if w > MaxiWidthExpanded:
+                    # 前面部分大于后面部分，是多出了空格加单词；前面部分小于后面部分，是多出了最后一个单词的一部分
                     exceeded = min(max(int((w - MaxiWidthExpanded) / w * len(text_joint)), 1), len(texts[-1]))
+                    # 这步可以保证 w <= MaxiWidthExpanded
                     text_joint = text_joint[:-exceeded].strip()
+                    # exceeded的第一种情况，texts[-1] = '';第二种情况，texts[-1]剩一半单词
                     texts[-1] = texts[-1][:-exceeded]
+                    # 如果exceeded前面部分小于后面部分，len(texts[-1])不为0；exceeded前面部分大于等于后面部分，len(texts[-1])不为0
                     if len(texts[-1]) == 0:
                         texts = texts[:-1]
                     w, h = self.CurrentFont.getsize(text_joint)
@@ -173,18 +182,18 @@ class WordRenderer(object):
             draw = ImageDraw.Draw(CharImage)
             if self.is_Arabic:
                 draw.text_alignment = 'right'
-                draw.text_antialias = True
-                draw.text_kerning = 0.0
+                draw.text_antialias = True # 抗锯齿
+                draw.text_kerning = 0.0 # 字距
             draw.text((0, 0),
                       text_joint,
                       fill='white',
                       font=self.CurrentFont)
             CharImg = np.asarray(CharImage).copy()
 
-            bbox = []
-            cbox = []
+            bbox = [] # Word坐标
+            cbox = [] # char坐标
             lens = [0]
-            text_joint += '   '
+            text_joint += '   ' # why?????????????????????????????????????
         except:
             return self.RenderStraightTextLine(MaximumWidth)
         
@@ -192,26 +201,30 @@ class WordRenderer(object):
         try:
             CharLocFaild = False
             for charCount in range(len(text_joint)):
+                # getsize返回w、h
                 lens.append(self.CurrentFont.getsize(text_joint[:charCount+1])[0])
 
                 if text_joint[charCount] != ' ':
                     Ys, Xs = np.nonzero(CharImg[:, lens[-2]:lens[-1], 0])
-                    if Ys.shape[0] == 0 or Xs.shape[0] == 0:
+                    if Ys.shape[0] == 0 or Xs.shape[0] == 0: # CharImg上没有字，应该不会出现
                         CharLocFaild = True
                         break
+                    # lens[-2]表示从上一个字符结束的坐标开始
                     XMin = np.min(Xs)+lens[-2]
                     XMax = np.max(Xs)+lens[-2]
                     YMin = np.min(Ys)
                     YMax = np.max(Ys)
                     # UL(X, Y), BR(X, Y)
-                    cbox.append([XMin, YMin, XMax, YMax])
+                    cbox.append([XMin, YMin, XMax, YMax]) # 只考虑字的边缘，而不是考虑字所在格子的坐标
             if not CharLocFaild:
+                # shape [N, 4]
                 cbox = np.array(cbox)
-                if cbox.shape[0] == 0:
+                if cbox.shape[0] == 0: # 没写上字
                     bbox = np.array(bbox)
                 else:
                     CharCount = 0
                     for word in texts:
+                        # shape [len(word), 4]
                         wordChar = cbox[CharCount:CharCount+len(word)]
                         bbox.append([np.min(wordChar[:, 0]),
                                      np.min(wordChar[:, 1]),
@@ -223,10 +236,11 @@ class WordRenderer(object):
                 bbox = []
                 lens = [0]
                 for charCount in range(len(text_joint)):
+                    # 判断条件是要么是text_joint最后一个位置，要么是每个单词的最后一个位置
                     if charCount == len(text_joint)-1 or (text_joint[charCount] != ' ' and text_joint[charCount+1] == ' '):
                         lens.append(self.CurrentFont.getsize(text_joint[:charCount + 1])[0])
                         Ys, Xs = np.nonzero(CharImg[:, lens[-2]:lens[-1], 0])
-                        XMin = np.min(Xs)+lens[-2]
+                        XMin = np.min(Xs)+lens[-2] # 会把空格包含进来
                         XMax = np.max(Xs)+lens[-2]
                         YMin = np.min(Ys)
                         YMax = np.max(Ys)
@@ -246,7 +260,7 @@ class WordRenderer(object):
     
     def getFontSize(self, Width, Height):
         maximum_row = int(Height / self.FontSize[0])
-        row_num = int(np.random.uniform(1, min(max([maximum_row, 1]), 10)))
+        row_num = int(np.random.uniform(1, min(max([maximum_row, 1]), 10))) # 确定字有几行，限制在最多10行，最小1行
         current_max = min(int(self.FontSize[1] * (random.random() * 0.8 + 0.25)), int(Width / 4))
         FontSize = max(int(min(Width, Height / row_num, current_max)), self.FontSize[0])
         return FontSize
@@ -277,6 +291,7 @@ class WordRenderer(object):
         CurrentHeight = 0
         MaxWidth = 0
         while True:
+            # SpacingFactor:间距
             CharImg, texts, text_joint, cbox, bbox = self.RenderStraightTextLine(Width, SpacingFactor=np.random.uniform(0, 0.4))
             if CharImg is None:
                 FontSize = self.getFontSize(Height, Width)
@@ -289,6 +304,7 @@ class WordRenderer(object):
                TextCrops = TextCrops[:-1]
                continue
             MaxWidth = max(MaxWidth, CharImg.shape[1])
+            # 防止高度多出太多
             if CurrentHeight > Height * 1.2 and len(TextCrops) > 1:
                 CurrentHeight -= TextCrops[-1][0].shape[0]
                 TextCrops = TextCrops[:-1]
@@ -312,7 +328,7 @@ class WordRenderer(object):
             H, W, _ = Img.shape
             for CharImg, texts, text_joint, cbox, bbox in TextCrops:
                 h, w, _ = CharImg.shape
-                left_pad = random.randint(0, W-w)
+                left_pad = random.randint(0, W-w) # 这步是导致每行字前面有空格的原因
                 if currentheight+h > H: break
                 Img[currentheight:currentheight+h, left_pad:w+left_pad] = CharImg
                 Texts += texts
@@ -322,18 +338,19 @@ class WordRenderer(object):
                 CBOX.append(cbox)
                 BBOX[-1][:, 1::2] += currentheight
                 CBOX[-1][:, 1::2] += currentheight
-                if random.random() < 0.5:
+                if random.random() < 0.5: # 调整两行之间是否有空隙
                     currentheight += int(h * random.uniform(1.0, 1.5))
                 else:
                     currentheight += h
             BBOX = np.concatenate(BBOX, axis=0)
             CBOX = np.concatenate(CBOX, axis=0)
         except:
-            pdb.set_trace()
+            pdb.set_trace() #中断进入调试器，使用continue命令关闭调试器继续执行
         
         if random.random() < 0.5:
             Color = Color * np.random.uniform(0.85, 1.0, size=Img.shape)
-        Img = (Img / 255 * Color).astype(np.uint8)
+        Img = (Img / 255 * Color).astype(np.uint8) # 改变字的颜色
+        # 用来做后面的透视变换
         CBOX = np.reshape(np.stack([CBOX[:, 0], CBOX[:, 1], CBOX[:, 2], CBOX[:, 1], CBOX[:, 2], CBOX[:, 3], CBOX[:, 0], CBOX[:, 3]], axis=-1), newshape=[-1, 4, 2])
         BBOX = np.reshape(np.stack([BBOX[:, 0], BBOX[:, 1], BBOX[:, 2], BBOX[:, 1], BBOX[:, 2], BBOX[:, 3], BBOX[:, 0], BBOX[:, 3]], axis=-1), newshape=[-1, 4, 2])
 
@@ -343,6 +360,7 @@ class WordRenderer(object):
             H, W, _ = Img.shape
             CBOX = CBOX.astype(np.float)
             BBOX = BBOX.astype(np.float)
+            # 归一化
             CBOX[:, :, 0] /= W
             CBOX[:, :, 1] /= H
             BBOX[:, :, 0] /= W
@@ -381,8 +399,10 @@ class WordRenderer(object):
         print(f'Found {len(self.AvailableFontPaths)} valid fonts.')
     
     def _CheckFont(self, font_path, glyph):
+        # 用来读取字体文件
         font = TTFont(font_path)
         for table in font['cmap'].tables:
+            # ord():得到Unicode 数值
              if ord(glyph) in table.cmap.keys():
                  return True
         return False
@@ -422,6 +442,7 @@ class WordRenderer(object):
             self.Corpus = ''.join(lines).replace('\n', '').replace(' ', '')
             if self.CorpusPath.find('corpus_zh') >= 0:
                 from hanziconv import HanziConv
+                # 繁简体转换
                 self.Corpus = HanziConv.toSimplified(self.Corpus)
                 print("Transformed to simplified Chinese")
             self.Vocabulary = None
@@ -448,7 +469,7 @@ class WordRenderer(object):
             if p < 0.25:
                 return word
             elif p < 0.5:
-                return word.lower() 
+                return word.lower() # 汉字不影响
             else:
                 return word.upper()
     

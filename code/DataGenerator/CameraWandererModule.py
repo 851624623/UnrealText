@@ -27,12 +27,12 @@ class RandomWanderer(CameraWanderer):
     def step(self, *args, **kwargs):
         step = kwargs.get('step', 0)
         if step % self.anchor_freq == 0 or kwargs.get('force_change_camera_anchor', False):
-            self.client.setCameraLocation(*(random.choice(self.preset_camera_anchors)))
+            self.client.setCameraLocation(*(random.choice(self.preset_camera_anchors))) # 定位到新anchor
             print('Camera locaton set to a pre-selected anchor.')
-        self.client.stepForward('default')
+        self.client.stepForward('default') # 转到新位置
     
     def _load_anchors(self):
-        print('Start to load preset camera anchors... ', end='')
+        print('\nStart to load preset camera anchors... ', end='')
         contents = open(self.camera_anchor_filepath, 'r').readlines()
         anchors = []
         for line in contents:

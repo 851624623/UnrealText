@@ -38,13 +38,14 @@ class BoxProposalModule(object):
            (x_right_min >= w) or \
            (y_down_max < 0) or \
            (y_up_min >= h) or \
-           (np.sum(normal_boundary_map[y_down_max:y_up_min, x_left_max:x_right_min]) > self.overlap_threshold):
+           (np.sum(normal_boundary_map[y_down_max:y_up_min, x_left_max:x_right_min]) > self.overlap_threshold): # 如果边缘像素大于阈值，即有边缘，就返回-1
             return -1 
 
         enlargeable_flag = True
         enlargement_count = 0
         direction = [1, 2, 3, 4]  # right, left, down, up
 
+        # 扩大proposal
         while enlargeable_flag:
             random.shuffle(direction)
             enlargeable_flag = False
@@ -115,14 +116,17 @@ class BoxProposalModule(object):
                 if result == -1:
                     continue
                 UL_x, UL_y, BR_x, BR_y = result
-                normal_boundary_map[UL_y:BR_y, UL_x: BR_x] = 1
+                normal_boundary_map[UL_y:BR_y, UL_x: BR_x] = 1 # 这步把合适的位置都置为1了，不考虑proposalnumber
                 center_x = (UL_x + BR_x) / 2
                 center_y = (UL_y + BR_y) / 2
+                # 这一步导致都是正方形，但会出现边界超出图片的可能
                 result = [center_x - self.min_box_size / 2, 
                           center_y - self.min_box_size / 2, 
                           center_x + self.min_box_size / 2, 
                           center_y + self.min_box_size / 2]
+                # result = [UL_x, UL_y, BR_x, BR_y]
                 Proposals.append(np.array(result, dtype=np.int)*self.MinimapRatio)
+                # 如果Proposals已经多于4倍的proposalnumber，停止循环，直接返回
                 if len(Proposals) >= proposalnumber * 4:
                     random.shuffle(Proposals)
                     return Proposals[:proposalnumber]
