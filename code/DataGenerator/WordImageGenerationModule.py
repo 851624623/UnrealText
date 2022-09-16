@@ -58,7 +58,7 @@ SeparatedBySpace = {
     "Bangla": True, 
     "Hindi": True, 
     "Latin": True,
-    "Tibetan": False, 
+    "Tibetan": True, 
 }
 
 class WordRenderer(object):
