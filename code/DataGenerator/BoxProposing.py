@@ -120,10 +120,10 @@ class BoxProposalModule(object):
                 center_x = (UL_x + BR_x) / 2
                 center_y = (UL_y + BR_y) / 2
                 # 这一步导致都是正方形，但会出现边界超出图片的可能
-                result = [center_x - self.min_box_size / 2, 
-                          center_y - self.min_box_size / 2, 
-                          center_x + self.min_box_size / 2, 
-                          center_y + self.min_box_size / 2]
+                result = [min(0, center_x - self.min_box_size / 2), 
+                          min(0, center_y - self.min_box_size / 2), 
+                          max(W, center_x + self.min_box_size / 2), 
+                          max(H, center_y + self.min_box_size / 2)]
                 # result = [UL_x, UL_y, BR_x, BR_y]
                 Proposals.append(np.array(result, dtype=np.int)*self.MinimapRatio)
                 # 如果Proposals已经多于4倍的proposalnumber，停止循环，直接返回
